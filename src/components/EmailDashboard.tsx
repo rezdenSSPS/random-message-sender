@@ -193,7 +193,7 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
                       <Input
                         id="from-email"
                         type="text"
-                        placeholder="Your Name <email@domain.com>"
+                        placeholder="Your Name <skillissue@tvojemamasmrdi.fun>"
                         value={fromEmail}
                         onChange={(e) => setFromEmail(e.target.value)}
                         className="bg-background/50 border-border focus:ring-primary"
