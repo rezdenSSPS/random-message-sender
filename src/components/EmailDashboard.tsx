@@ -28,8 +28,9 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
   const [subject, setSubject] = useState("Random Message");
   
   // Timing settings
-  const [timingMode, setTimingMode] = useState<"random" | "custom">("random");
-  const [customDelay, setCustomDelay] = useState("60"); // minutes between emails
+  const [scheduleType, setScheduleType] = useState<"now" | "scheduled">("now");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
 
   const handleStartCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,8 +57,9 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
           count: count,
           fromEmail: testMode ? fromEmail : undefined,
           subject: testMode ? subject : undefined,
-          timingMode,
-          customDelay: timingMode === "custom" ? parseInt(customDelay) : undefined
+          scheduleType,
+          startTime: scheduleType === "scheduled" ? startTime : undefined,
+          endTime: scheduleType === "scheduled" ? endTime : undefined
         }
       });
 
@@ -65,7 +67,7 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
         throw error;
       }
 
-      toast.success(`Campaign started! Will send ${count} emails randomly throughout the day`);
+      toast.success(`Campaign started! Will send ${count} emails.`);
       setCampaignStatus("completed");
       
       // Reset form
@@ -132,7 +134,7 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
                     <div className="w-2 h-2 bg-black rounded-full animate-pulse" />
                     Running
                   </Badge>
-                  <span className="text-muted-foreground">Campaign is active and sending emails randomly</span>
+                  <span className="text-muted-foreground">Campaign is active and sending emails</span>
                 </>
               )}
               {campaignStatus === "completed" && (
@@ -220,42 +222,51 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
                   <div className="flex items-center space-x-2">
                     <input
                       type="radio"
-                      id="random-timing"
+                      id="now"
                       name="timing"
-                      value="random"
-                      checked={timingMode === "random"}
-                      onChange={(e) => setTimingMode(e.target.value as "random" | "custom")}
+                      value="now"
+                      checked={scheduleType === "now"}
+                      onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")}
                       className="text-primary"
                     />
-                    <Label htmlFor="random-timing">Random throughout the day</Label>
+                    <Label htmlFor="now">Send now</Label>
                   </div>
                   <div className="flex items-center space-x-2">
                     <input
                       type="radio"
-                      id="custom-timing"
+                      id="scheduled"
                       name="timing"
-                      value="custom"
-                      checked={timingMode === "custom"}
-                      onChange={(e) => setTimingMode(e.target.value as "random" | "custom")}
+                      value="scheduled"
+                      checked={scheduleType === "scheduled"}
+                      onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")}
                       className="text-primary"
                     />
-                    <Label htmlFor="custom-timing">Custom delay</Label>
+                    <Label htmlFor="scheduled">Schedule</Label>
                   </div>
                 </div>
                 
-                {timingMode === "custom" && (
-                  <div className="space-y-2">
-                    <Label htmlFor="delay" className="text-foreground">Delay between emails (minutes)</Label>
-                    <Input
-                      id="delay"
-                      type="number"
-                      min="1"
-                      max="1440"
-                      placeholder="60"
-                      value={customDelay}
-                      onChange={(e) => setCustomDelay(e.target.value)}
-                      className="bg-background/50 border-border focus:ring-primary w-32"
-                    />
+                {scheduleType === "scheduled" && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="start-time" className="text-foreground">Start Time</Label>
+                      <Input
+                        id="start-time"
+                        type="datetime-local"
+                        value={startTime}
+                        onChange={(e) => setStartTime(e.target.value)}
+                        className="bg-background/50 border-border focus:ring-primary"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="end-time" className="text-foreground">End Time</Label>
+                      <Input
+                        id="end-time"
+                        type="datetime-local"
+                        value={endTime}
+                        onChange={(e) => setEndTime(e.target.value)}
+                        className="bg-background/50 border-border focus:ring-primary"
+                      />
+                    </div>
                   </div>
                 )}
               </div>
@@ -305,9 +316,9 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
               <Alert className="border-primary/50 bg-primary/10">
                 <AlertCircle className="w-4 h-4 text-primary" />
                 <AlertDescription className="text-primary">
-                  {timingMode === "random" 
-                    ? `Emails will be sent at random intervals throughout the day. The system will distribute the ${emailCount || "specified number of"} emails randomly over a 24-hour period.`
-                    : `Emails will be sent with a ${customDelay || "60"} minute delay between each email.`
+                  {scheduleType === "now"
+                    ? `Emails will be sent immediately with a short random delay between them.`
+                    : `Emails will be sent randomly between the selected start and end times.`
                   }
                 </AlertDescription>
               </Alert>
