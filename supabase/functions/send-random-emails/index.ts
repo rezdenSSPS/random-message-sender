@@ -14,8 +14,9 @@ interface EmailRequest {
   count: number;
   fromEmail?: string;
   subject?: string;
-  timingMode?: "random" | "custom";
-  customDelay?: number; // in minutes
+  scheduleType: "now" | "scheduled";
+  startTime?: string;
+  endTime?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,7 +26,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, message, count, fromEmail, subject, timingMode = "random", customDelay }: EmailRequest = await req.json();
+    const { email, message, count, fromEmail, subject, scheduleType, startTime, endTime }: EmailRequest = await req.json();
     
     console.log(`Starting email campaign: ${count} emails to ${email}`);
     
@@ -50,23 +51,43 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Generate delays for emails based on timing mode
+    // Generate delays for emails
     const delays: number[] = [];
     
-    if (timingMode === "custom" && customDelay) {
-      // Custom delay mode - send emails with fixed intervals
+    if (scheduleType === "now") {
+      // Send immediately with a small random delay
       for (let i = 0; i < count; i++) {
-        const delayInSeconds = i * customDelay * 60; // Convert minutes to seconds
-        delays.push(delayInSeconds);
+        delays.push(Math.random() * 10); // 0-10 seconds delay
       }
-    } else {
-      // Random delay mode - spread over 24 hours
-      const maxDelay = 86400; // 24 hours in seconds
+    } else if (scheduleType === "scheduled" && startTime && endTime) {
+      const start = new Date(startTime).getTime();
+      const end = new Date(endTime).getTime();
+      const now = Date.now();
+      
+      if (start < now || end < start) {
+        return new Response(
+          JSON.stringify({ error: "Invalid start or end time" }),
+          {
+            status: 400,
+            headers: { "Content-Type": "application/json", ...corsHeaders },
+          }
+        );
+      }
+      
+      const interval = (end - start) / 1000; // in seconds
       for (let i = 0; i < count; i++) {
-        const randomDelay = Math.floor(Math.random() * maxDelay);
-        delays.push(randomDelay);
+        const randomDelay = Math.floor(Math.random() * interval);
+        delays.push(randomDelay + (start - now)/1000);
       }
       delays.sort((a, b) => a - b);
+    } else {
+        return new Response(
+            JSON.stringify({ error: "Invalid schedule type or missing time" }),
+            {
+              status: 400,
+              headers: { "Content-Type": "application/json", ...corsHeaders },
+            }
+          );
     }
     
     console.log(`Generated delays (seconds):`, delays);
@@ -98,8 +119,6 @@ const handler = async (req: Request): Promise<Response> => {
                       This is email ${emailNumber} of ${count} in your email campaign.
                       <br>
                       Sent at: ${new Date().toLocaleString()}
-                      <br>
-                      ${timingMode === "custom" ? `Delay: ${customDelay} minutes between emails` : "Random timing throughout the day"}
                     </p>
                   </div>
                 `,
@@ -119,7 +138,7 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(
       JSON.stringify({ 
         success: true, 
-        message: `Campaign started! ${count} emails scheduled with random delays.`,
+        message: `Campaign started! ${count} emails scheduled.`,
         delays: delays.map(d => `${Math.floor(d / 3600)}h ${Math.floor((d % 3600) / 60)}m`)
       }),
       {
