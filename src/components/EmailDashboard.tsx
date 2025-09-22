@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Mail, Send, Clock, LogOut, CheckCircle, AlertCircle } from "lucide-react";
+import { Mail, Send, Clock, LogOut, CheckCircle, AlertCircle, Settings } from "lucide-react";
 
 interface EmailDashboardProps {
   onLogout: () => void;
@@ -20,6 +21,15 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
   const [emailCount, setEmailCount] = useState("5");
   const [isLoading, setIsLoading] = useState(false);
   const [campaignStatus, setCampaignStatus] = useState<"idle" | "running" | "completed">("idle");
+  
+  // Test mode settings
+  const [testMode, setTestMode] = useState(false);
+  const [fromEmail, setFromEmail] = useState("Email Sender <onboarding@resend.dev>");
+  const [subject, setSubject] = useState("Random Message");
+  
+  // Timing settings
+  const [timingMode, setTimingMode] = useState<"random" | "custom">("random");
+  const [customDelay, setCustomDelay] = useState("60"); // minutes between emails
 
   const handleStartCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +53,11 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
         body: {
           email,
           message,
-          count: count
+          count: count,
+          fromEmail: testMode ? fromEmail : undefined,
+          subject: testMode ? subject : undefined,
+          timingMode,
+          customDelay: timingMode === "custom" ? parseInt(customDelay) : undefined
         }
       });
 
@@ -134,6 +148,26 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
           </CardContent>
         </Card>
 
+        {/* Test Mode Toggle */}
+        <Card className="bg-gradient-to-r from-card to-secondary/20 border border-border/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Settings className="w-5 h-5" />
+              Test Mode
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center space-x-2">
+              <Switch
+                checked={testMode}
+                onCheckedChange={setTestMode}
+                id="test-mode"
+              />
+              <Label htmlFor="test-mode">Enable advanced configuration (Admin only)</Label>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Email Configuration */}
         <Card className="bg-gradient-to-br from-card via-card to-secondary/20 border border-border/50 shadow-lg">
           <CardHeader>
@@ -147,6 +181,85 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleStartCampaign} className="space-y-6">
+              {/* Test Mode Configuration */}
+              {testMode && (
+                <div className="space-y-4 p-4 bg-secondary/20 rounded-lg border border-border/50">
+                  <h3 className="text-lg font-semibold text-foreground">Advanced Configuration</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="from-email" className="text-foreground">From Email</Label>
+                      <Input
+                        id="from-email"
+                        type="text"
+                        placeholder="Your Name <email@domain.com>"
+                        value={fromEmail}
+                        onChange={(e) => setFromEmail(e.target.value)}
+                        className="bg-background/50 border-border focus:ring-primary"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="subject" className="text-foreground">Subject Template</Label>
+                      <Input
+                        id="subject"
+                        type="text"
+                        placeholder="Email subject"
+                        value={subject}
+                        onChange={(e) => setSubject(e.target.value)}
+                        className="bg-background/50 border-border focus:ring-primary"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Timing Configuration */}
+              <div className="space-y-4 p-4 bg-secondary/20 rounded-lg border border-border/50">
+                <h3 className="text-lg font-semibold text-foreground">Email Timing</h3>
+                <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="random-timing"
+                      name="timing"
+                      value="random"
+                      checked={timingMode === "random"}
+                      onChange={(e) => setTimingMode(e.target.value as "random" | "custom")}
+                      className="text-primary"
+                    />
+                    <Label htmlFor="random-timing">Random throughout the day</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="radio"
+                      id="custom-timing"
+                      name="timing"
+                      value="custom"
+                      checked={timingMode === "custom"}
+                      onChange={(e) => setTimingMode(e.target.value as "random" | "custom")}
+                      className="text-primary"
+                    />
+                    <Label htmlFor="custom-timing">Custom delay</Label>
+                  </div>
+                </div>
+                
+                {timingMode === "custom" && (
+                  <div className="space-y-2">
+                    <Label htmlFor="delay" className="text-foreground">Delay between emails (minutes)</Label>
+                    <Input
+                      id="delay"
+                      type="number"
+                      min="1"
+                      max="1440"
+                      placeholder="60"
+                      value={customDelay}
+                      onChange={(e) => setCustomDelay(e.target.value)}
+                      className="bg-background/50 border-border focus:ring-primary w-32"
+                    />
+                  </div>
+                )}
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="email" className="text-foreground">Recipient Email</Label>
@@ -192,8 +305,10 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
               <Alert className="border-primary/50 bg-primary/10">
                 <AlertCircle className="w-4 h-4 text-primary" />
                 <AlertDescription className="text-primary">
-                  Emails will be sent at random intervals throughout the day. The system will distribute 
-                  the {emailCount || "specified number of"} emails randomly over a 24-hour period.
+                  {timingMode === "random" 
+                    ? `Emails will be sent at random intervals throughout the day. The system will distribute the ${emailCount || "specified number of"} emails randomly over a 24-hour period.`
+                    : `Emails will be sent with a ${customDelay || "60"} minute delay between each email.`
+                  }
                 </AlertDescription>
               </Alert>
 

@@ -12,6 +12,10 @@ interface EmailRequest {
   email: string;
   message: string;
   count: number;
+  fromEmail?: string;
+  subject?: string;
+  timingMode?: "random" | "custom";
+  customDelay?: number; // in minutes
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -21,7 +25,7 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, message, count }: EmailRequest = await req.json();
+    const { email, message, count, fromEmail, subject, timingMode = "random", customDelay }: EmailRequest = await req.json();
     
     console.log(`Starting email campaign: ${count} emails to ${email}`);
     
@@ -46,18 +50,24 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Generate random delays for emails (spread over 24 hours = 86400 seconds)
+    // Generate delays for emails based on timing mode
     const delays: number[] = [];
-    const maxDelay = 86400; // 24 hours in seconds
     
-    for (let i = 0; i < count; i++) {
-      // Generate random delay between 0 and 24 hours
-      const randomDelay = Math.floor(Math.random() * maxDelay);
-      delays.push(randomDelay);
+    if (timingMode === "custom" && customDelay) {
+      // Custom delay mode - send emails with fixed intervals
+      for (let i = 0; i < count; i++) {
+        const delayInSeconds = i * customDelay * 60; // Convert minutes to seconds
+        delays.push(delayInSeconds);
+      }
+    } else {
+      // Random delay mode - spread over 24 hours
+      const maxDelay = 86400; // 24 hours in seconds
+      for (let i = 0; i < count; i++) {
+        const randomDelay = Math.floor(Math.random() * maxDelay);
+        delays.push(randomDelay);
+      }
+      delays.sort((a, b) => a - b);
     }
-    
-    // Sort delays to send emails in chronological order
-    delays.sort((a, b) => a - b);
     
     console.log(`Generated delays (seconds):`, delays);
 
@@ -71,21 +81,25 @@ const handler = async (req: Request): Promise<Response> => {
         new Promise((resolve) => {
           setTimeout(async () => {
             try {
+              const emailSubject = subject ? `${subject} #${emailNumber}` : `Random Message #${emailNumber}`;
+              
               const emailResponse = await resend.emails.send({
-                from: "Email Sender <onboarding@resend.dev>",
+                from: fromEmail || "Email Sender <onboarding@resend.dev>",
                 to: [email],
-                subject: `Random Message #${emailNumber}`,
+                subject: emailSubject,
                 html: `
                   <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2 style="color: #6366f1;">Random Message #${emailNumber}</h2>
+                    <h2 style="color: #6366f1;">${emailSubject}</h2>
                     <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #6366f1;">
                       <p style="margin: 0; line-height: 1.6;">${message.replace(/\n/g, '<br>')}</p>
                     </div>
                     <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
                     <p style="color: #64748b; font-size: 14px;">
-                      This is email ${emailNumber} of ${count} in your random email campaign.
+                      This is email ${emailNumber} of ${count} in your email campaign.
                       <br>
                       Sent at: ${new Date().toLocaleString()}
+                      <br>
+                      ${timingMode === "custom" ? `Delay: ${customDelay} minutes between emails` : "Random timing throughout the day"}
                     </p>
                   </div>
                 `,

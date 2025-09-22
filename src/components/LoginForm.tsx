@@ -106,9 +106,6 @@ export const LoginForm = ({ onLogin, error }: LoginFormProps) => {
           </CardContent>
         </Card>
 
-        <div className="text-center text-sm text-muted-foreground">
-          Use credentials: admin / admin
-        </div>
       </div>
     </div>
   );
