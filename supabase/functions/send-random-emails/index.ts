@@ -8,11 +8,21 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Helper function to generate a random string for the email username
+function generateRandomString(length: number): string {
+  const characters = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+}
+
 interface EmailRequest {
   email: string;
   message: string;
   count: number;
-  fromEmail?: string;
+  fromEmail?: string; // This will now primarily be used for the "Display Name"
   subject?: string;
   scheduleType: "now" | "scheduled";
   scheduleDate?: string;
@@ -72,14 +82,46 @@ const handler = async (req: Request): Promise<Response> => {
         new Promise((resolve) => {
           setTimeout(async () => {
             try {
+              // --- DYNAMIC FROM ADDRESS LOGIC ---
+              const randomUsername = generateRandomString(5);
+              const fromDomain = "tvojemamasmrdi.fun"; // Your verified domain
+              const dynamicFromEmail = `${randomUsername}@${fromDomain}`;
+
+              let fromDisplayName = "Campaign Sender"; // Default display name
+              // Use display name from test mode if provided
+              if (fromEmail) {
+                  const match = fromEmail.match(/^(.*)<.*>$/);
+                  if (match && match[1]) {
+                      fromDisplayName = match[1].trim();
+                  }
+              }
+
+              const finalFromAddress = `${fromDisplayName} <${dynamicFromEmail}>`;
+              // --- END DYNAMIC LOGIC ---
+
               const emailSubject = subject ? `${subject} #${emailNumber}` : `Random Message #${emailNumber}`;
+              
               await resend.emails.send({
-                from: fromEmail || "Email Sender <onboarding@resend.dev>",
+                from: finalFromAddress,
                 to: [email],
                 subject: emailSubject,
-                html: `<p>${message.replace(/\n/g, '<br>')}</p><br><p><small>This is email ${emailNumber} of ${count}.</small></p>`,
+                html: `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2 style="color: #6366f1;">${emailSubject}</h2>
+                    <div style="background: #f8fafc; padding: 20px; border-radius: 8px; border-left: 4px solid #6366f1;">
+                      <p style="margin: 0; line-height: 1.6;">${message.replace(/\n/g, '<br>')}</p>
+                    </div>
+                    <hr style="margin: 20px 0; border: none; border-top: 1px solid #e2e8f0;">
+                    <p style="color: #64748b; font-size: 14px;">
+                      This is email ${emailNumber} of ${count} in your email campaign.
+                      <br>
+                      Sent at: ${new Date().toLocaleString()}
+                    </p>
+                  </div>
+                `,
               });
-              console.log(`Email ${emailNumber} sent successfully at ${new Date().toISOString()}`);
+              
+              console.log(`Email ${emailNumber} sent successfully from ${finalFromAddress} at ${new Date().toISOString()}`);
               resolve(true);
             } catch (error) {
               console.error(`Failed to send email ${emailNumber}:`, error);
