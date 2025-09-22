@@ -10,6 +10,10 @@ import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Mail, Send, Clock, LogOut, CheckCircle, AlertCircle, Settings } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CalendarIcon } from "lucide-react";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
 
 interface EmailDashboardProps {
   onLogout: () => void;
@@ -21,6 +25,7 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
   const [emailCount, setEmailCount] = useState("5");
   const [isLoading, setIsLoading] = useState(false);
   const [campaignStatus, setCampaignStatus] = useState<"idle" | "running" | "completed">("idle");
+  const [scheduledTimes, setScheduledTimes] = useState<string[]>([]);
   
   // Test mode settings
   const [testMode, setTestMode] = useState(false);
@@ -29,8 +34,9 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
   
   // Timing settings
   const [scheduleType, setScheduleType] = useState<"now" | "scheduled">("now");
-  const [startTime, setStartTime] = useState("");
-  const [endTime, setEndTime] = useState("");
+  const [scheduleDate, setScheduleDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState("09:00");
+  const [endTime, setEndTime] = useState("17:00");
 
   const handleStartCampaign = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,29 +52,39 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
       return;
     }
 
+    if (scheduleType === "scheduled" && (!scheduleDate || !startTime || !endTime)) {
+      toast.error("Please select a date, start time, and end time for scheduled campaigns.");
+      return;
+    }
+
     setIsLoading(true);
     setCampaignStatus("running");
+    setScheduledTimes([]);
 
     try {
-      const { data, error } = await supabase.functions.invoke('send-random-emails', {
-        body: {
-          email,
-          message,
-          count: count,
-          fromEmail: testMode ? fromEmail : undefined,
-          subject: testMode ? subject : undefined,
-          scheduleType,
-          startTime: scheduleType === "scheduled" ? startTime : undefined,
-          endTime: scheduleType === "scheduled" ? endTime : undefined
-        }
-      });
+      const body = {
+        email,
+        message,
+        count: count,
+        fromEmail: testMode ? fromEmail : undefined,
+        subject: testMode ? subject : undefined,
+        scheduleType,
+        scheduleDate: scheduleType === "scheduled" ? scheduleDate?.toISOString().split('T')[0] : undefined,
+        startTime: scheduleType === "scheduled" ? startTime : undefined,
+        endTime: scheduleType === "scheduled" ? endTime : undefined
+      };
+      
+      const { data, error } = await supabase.functions.invoke('send-random-emails', { body });
 
       if (error) {
         throw error;
       }
 
-      toast.success(`Campaign started! Will send ${count} emails.`);
+      toast.success(`Campaign started! ${count} emails scheduled.`);
       setCampaignStatus("completed");
+      if (data.scheduledTimestamps) {
+        setScheduledTimes(data.scheduledTimestamps);
+      }
       
       // Reset form
       setEmail("");
@@ -149,6 +165,24 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
             </div>
           </CardContent>
         </Card>
+        
+        {/* Scheduled Times Display */}
+        {scheduledTimes.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Scheduled Email Times</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="list-disc pl-5 text-left">
+                {scheduledTimes.map((time, index) => (
+                  <li key={index} className="text-muted-foreground">
+                    Email {index + 1}: {new Date(time).toLocaleString()}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Test Mode Toggle */}
         <Card className="bg-gradient-to-r from-card to-secondary/20 border border-border/50">
@@ -193,7 +227,7 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
                       <Input
                         id="from-email"
                         type="text"
-                        placeholder="Your Name <skillissue@tvojemamasmrdi.fun>"
+                        placeholder="Your Name <email@domain.com>"
                         value={fromEmail}
                         onChange={(e) => setFromEmail(e.target.value)}
                         className="bg-background/50 border-border focus:ring-primary"
@@ -246,12 +280,34 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
                 </div>
                 
                 {scheduleType === "scheduled" && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="schedule-date">Date</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant={"outline"}
+                            className="w-full justify-start text-left font-normal"
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={scheduleDate}
+                            onSelect={setScheduleDate}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
                     <div className="space-y-2">
                       <Label htmlFor="start-time" className="text-foreground">Start Time</Label>
                       <Input
                         id="start-time"
-                        type="datetime-local"
+                        type="time"
                         value={startTime}
                         onChange={(e) => setStartTime(e.target.value)}
                         className="bg-background/50 border-border focus:ring-primary"
@@ -261,7 +317,7 @@ export const EmailDashboard = ({ onLogout }: EmailDashboardProps) => {
                       <Label htmlFor="end-time" className="text-foreground">End Time</Label>
                       <Input
                         id="end-time"
-                        type="datetime-local"
+                        type="time"
                         value={endTime}
                         onChange={(e) => setEndTime(e.target.value)}
                         className="bg-background/50 border-border focus:ring-primary"
