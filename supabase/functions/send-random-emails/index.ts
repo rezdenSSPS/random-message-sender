@@ -15,9 +15,9 @@ interface EmailRequest {
   fromEmail?: string;
   subject?: string;
   scheduleType: "now" | "scheduled";
-  scheduleDate?: string;
-  startTime?: string;
-  endTime?: string;
+  scheduleDate?: string; // YYYY-MM-DD
+  startTime?: string;  // HH:mm
+  endTime?: string;    // HH:mm
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -28,13 +28,11 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, message, count, fromEmail, subject, scheduleType, scheduleDate, startTime, endTime }: EmailRequest = await req.json();
 
-    // Create a Supabase client with the service role key to bypass RLS
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
     );
 
-    // 1. Create a new campaign record in the database
     const { data: campaignData, error: campaignError } = await supabaseAdmin
       .from('campaigns')
       .insert({
@@ -49,7 +47,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (campaignError) throw campaignError;
 
-    // 2. Calculate all scheduled timestamps
     const scheduledTimestamps: Date[] = [];
     const now = new Date();
 
@@ -59,26 +56,40 @@ const handler = async (req: Request): Promise<Response> => {
         scheduledTimestamps.push(new Date(now.getTime() + delay));
       }
     } else if (scheduleType === "scheduled" && scheduleDate && startTime && endTime) {
-      const startDateTime = new Date(`${scheduleDate}T${startTime}`);
-      const endDateTime = new Date(`${scheduleDate}T${endTime}`);
-      const interval = endDateTime.getTime() - startDateTime.getTime();
+      // --- FIX STARTS HERE ---
+      // Reconstruct dates correctly to avoid timezone ambiguity
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
 
+      const startDate = new Date(scheduleDate);
+      startDate.setHours(startHour, startMinute, 0, 0);
+
+      const endDate = new Date(scheduleDate);
+      endDate.setHours(endHour, endMinute, 0, 0);
+      
+      const startDateTime = startDate.getTime();
+      const endDateTime = endDate.getTime();
+      // --- FIX ENDS HERE ---
+
+      if (endDateTime < startDateTime) {
+        return new Response(JSON.stringify({ error: "End time cannot be before start time." }), { status: 400, headers: { ...corsHeaders } });
+      }
+      
+      const interval = endDateTime - startDateTime;
       for (let i = 0; i < count; i++) {
         const randomOffset = Math.random() * interval;
-        scheduledTimestamps.push(new Date(startDateTime.getTime() + randomOffset));
+        scheduledTimestamps.push(new Date(startDateTime + randomOffset));
       }
     } else {
         return new Response(JSON.stringify({ error: "Invalid schedule type or missing parameters" }), { status: 400, headers: { ...corsHeaders } });
     }
     
-    // 3. Create the individual email records to be inserted
     const emailsToInsert = scheduledTimestamps.map(ts => ({
       campaign_id: campaignData.id,
       status: 'scheduled',
       scheduled_at: ts.toISOString(),
     }));
 
-    // 4. Insert all scheduled emails into the database
     const { error: emailsError } = await supabaseAdmin
       .from('scheduled_emails')
       .insert(emailsToInsert);
@@ -91,10 +102,7 @@ const handler = async (req: Request): Promise<Response> => {
         message: `Campaign scheduled successfully! ${count} emails are now in the queue.`,
         scheduledTimestamps: scheduledTimestamps.map(d => d.toISOString()),
       }),
-      {
-        status: 200,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      }
+      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );
 
   } catch (error: any) {

@@ -7,18 +7,18 @@ const Login = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Check if already authenticated
     if (localStorage.getItem("isAuthenticated") === "true") {
       navigate("/dashboard");
     }
   }, [navigate]);
 
   const handleLogin = (username: string, password: string) => {
-    if (username === "admin" && password === "admin") {
+    // UPDATED: Changed login credentials
+    if (username === "denis" && password === "admin") {
       localStorage.setItem("isAuthenticated", "true");
       navigate("/dashboard");
     } else {
-      setError("Invalid credentials. Please use admin/admin");
+      setError("Invalid credentials. Please try again.");
     }
   };
 
