@@ -44,7 +44,6 @@ const fetchScheduledEmails = async (): Promise<ScheduledEmail[]> => {
   if (error) {
     throw new Error(error.message);
   }
-  // Supabase může vrátit null, i když nedojde k chybě
   return (data as ScheduledEmail[] | null) || [];
 };
 
@@ -66,7 +65,7 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
   const { data: scheduledEmails, isLoading: emailsLoading } = useQuery({
     queryKey: ['scheduledEmails'],
     queryFn: fetchScheduledEmails,
-    refetchInterval: 5000, // Znovu načte data každých 5 sekund
+    refetchInterval: 5000,
   });
 
   // --- Seskupení emailů podle příjemce ---
@@ -130,7 +129,6 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* --- Levé Sloupec: Formulář --- */}
       <div className="lg:col-span-1 space-y-6">
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -180,16 +178,15 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
                     </div>
                 )}
 
-                {/* TENTO BLOK CHYBĚL */}
                 <div className="space-y-4 p-4 bg-secondary/20 rounded-lg border border-border/50">
                   <h3 className="text-lg font-semibold text-foreground">Timing</h3>
                   <div className="flex items-center space-x-4">
                     <div className="flex items-center space-x-2">
-                      <input type="radio" id="now" name="timing" value="now" checked={scheduleType === "now"} onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")} className="text-primary"/>
+                      <input type="radio" id="now" name="timing" value="now" checked={scheduleType === "now"} onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")} />
                       <Label htmlFor="now">Send now</Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <input type="radio" id="scheduled" name="timing" value="scheduled" checked={scheduleType === "scheduled"} onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")} className="text-primary"/>
+                      <input type="radio" id="scheduled" name="timing" value="scheduled" checked={scheduleType === "scheduled"} onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")} />
                       <Label htmlFor="scheduled">Schedule</Label>
                     </div>
                   </div>
@@ -243,7 +240,6 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
          </Card>
       </div>
 
-      {/* --- Pravý Sloupec: Fronta emailů --- */}
       <div className="lg:col-span-2">
         <Card className="h-full">
           <CardHeader>
