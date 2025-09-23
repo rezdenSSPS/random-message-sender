@@ -1,5 +1,3 @@
-// /supabase/functions/send-random-emails/index.ts
-
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 
@@ -15,9 +13,9 @@ interface EmailRequest {
   fromEmail?: string;
   subject?: string;
   scheduleType: "now" | "scheduled";
-  scheduleDate?: string; // YYYY-MM-DD
-  startTime?: string;  // HH:mm
-  endTime?: string;    // HH:mm
+  scheduleDate?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -52,15 +50,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (scheduleType === "now") {
       for (let i = 0; i < count; i++) {
-        const delay = Math.random() * 60 * 1000; // 0-60 seconds delay
+        const delay = Math.random() * 60 * 1000;
         scheduledTimestamps.push(new Date(now.getTime() + delay));
       }
     } else if (scheduleType === "scheduled" && scheduleDate && startTime && endTime) {
-      // --- FIX STARTS HERE ---
-      // Reconstruct dates correctly to avoid timezone ambiguity
+      // --- OPRAVA CHYBY S ČASOVOU ZÓNOU ---
       const [startHour, startMinute] = startTime.split(':').map(Number);
       const [endHour, endMinute] = endTime.split(':').map(Number);
-
+      
       const startDate = new Date(scheduleDate);
       startDate.setHours(startHour, startMinute, 0, 0);
 
@@ -69,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
       
       const startDateTime = startDate.getTime();
       const endDateTime = endDate.getTime();
-      // --- FIX ENDS HERE ---
+      // --- KONEC OPRAVY ---
 
       if (endDateTime < startDateTime) {
         return new Response(JSON.stringify({ error: "End time cannot be before start time." }), { status: 400, headers: { ...corsHeaders } });

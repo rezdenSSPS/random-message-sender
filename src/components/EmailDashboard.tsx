@@ -1,22 +1,20 @@
-// /src/components/EmailDashboard.tsx
 import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Mail, Send, Clock, LogOut, AlertCircle, Settings, User, Calendar as CalendarIcon } from "lucide-react";
+import { Mail, Send, Clock, LogOut, Settings, User, Calendar as CalendarIcon } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { useQuery } from "@tanstack/react-query";
 import { ScrollArea } from "./ui/scroll-area";
 
-// --- Types for our database data ---
+// --- Typy pro data z databáze ---
 interface ScheduledEmail {
   id: string;
   scheduled_at: string;
@@ -29,7 +27,7 @@ interface GroupedEmails {
   [recipient: string]: ScheduledEmail[];
 }
 
-// --- Data fetching function ---
+// --- Funkce pro načítání dat ---
 const fetchScheduledEmails = async (): Promise<ScheduledEmail[]> => {
   const { data, error } = await supabase
     .from('scheduled_emails')
@@ -46,11 +44,12 @@ const fetchScheduledEmails = async (): Promise<ScheduledEmail[]> => {
   if (error) {
     throw new Error(error.message);
   }
-  return data as ScheduledEmail[];
+  // Supabase může vrátit null, i když nedojde k chybě
+  return (data as ScheduledEmail[] | null) || [];
 };
 
 export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
-  // State for the form
+  // Stav pro formulář
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [emailCount, setEmailCount] = useState("5");
@@ -63,14 +62,14 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
   const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
 
-  // --- Live Query for Scheduled Emails ---
+  // --- Live dotaz na naplánované emaily ---
   const { data: scheduledEmails, isLoading: emailsLoading } = useQuery({
     queryKey: ['scheduledEmails'],
     queryFn: fetchScheduledEmails,
-    refetchInterval: 5000, // Refetch every 5 seconds
+    refetchInterval: 5000, // Znovu načte data každých 5 sekund
   });
 
-  // --- Group emails by recipient ---
+  // --- Seskupení emailů podle příjemce ---
   const groupedEmails = useMemo(() => {
     if (!scheduledEmails) return {};
     return scheduledEmails.reduce((acc, email) => {
@@ -84,7 +83,6 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
   }, [scheduledEmails]);
 
   const handleStartCampaign = async (e: React.FormEvent) => {
-    // ... (This function remains the same as before)
     e.preventDefault();
     if (!email || !message || !emailCount) {
         toast.error("Please fill in all fields");
@@ -132,9 +130,8 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
-      {/* --- Left Column: Form --- */}
+      {/* --- Levé Sloupec: Formulář --- */}
       <div className="lg:col-span-1 space-y-6">
-        {/* Header */}
         <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-gradient-to-r from-primary to-primary-glow rounded-lg flex items-center justify-center">
@@ -151,7 +148,6 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
             </Button>
         </div>
         
-        {/* Test Mode Toggle */}
         <Card>
            <CardHeader>
              <CardTitle className="flex items-center gap-2 text-lg"><Settings className="w-5 h-5" /> Test Mode</CardTitle>
@@ -164,7 +160,6 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
            </CardContent>
          </Card>
 
-        {/* Email Form */}
         <Card className="shadow-lg">
            <CardHeader>
              <CardTitle className="flex items-center gap-2 text-lg"><Send className="w-5 h-5" /> Configure Campaign</CardTitle>
@@ -184,14 +179,52 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
                       </div>
                     </div>
                 )}
-                <div className="space-y-4 p-4 bg-secondary/20 rounded-lg">
-                     <h3 className="font-semibold text-foreground">Timing</h3>
-                     {/* ... (Timing radio buttons and inputs remain the same) */}
+
+                {/* TENTO BLOK CHYBĚL */}
+                <div className="space-y-4 p-4 bg-secondary/20 rounded-lg border border-border/50">
+                  <h3 className="text-lg font-semibold text-foreground">Timing</h3>
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center space-x-2">
+                      <input type="radio" id="now" name="timing" value="now" checked={scheduleType === "now"} onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")} className="text-primary"/>
+                      <Label htmlFor="now">Send now</Label>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <input type="radio" id="scheduled" name="timing" value="scheduled" checked={scheduleType === "scheduled"} onChange={(e) => setScheduleType(e.target.value as "now" | "scheduled")} className="text-primary"/>
+                      <Label htmlFor="scheduled">Schedule</Label>
+                    </div>
+                  </div>
+                  {scheduleType === "scheduled" && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="schedule-date">Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant={"outline"} className="w-full justify-start text-left font-normal">
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {scheduleDate ? format(scheduleDate, "PPP") : <span>Pick a date</span>}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0">
+                            <Calendar mode="single" selected={scheduleDate} onSelect={setScheduleDate} initialFocus/>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="start-time">Start Time</Label>
+                        <Input id="start-time" type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)}/>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="end-time">End Time</Label>
+                        <Input id="end-time" type="time" value={endTime} onChange={(e) => setEndTime(e.target.value)} />
+                      </div>
+                    </div>
+                  )}
                 </div>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="email">Recipient Email</Label>
-                    <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+                    <Input id="email" type="email" placeholder="user@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="count">Number of Emails</Label>
@@ -200,7 +233,7 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="message">Message</Label>
-                  <Textarea id="message" value={message} onChange={(e) => setMessage(e.target.value)} required />
+                  <Textarea id="message" placeholder="Your message here..." value={message} onChange={(e) => setMessage(e.target.value)} required />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                     {isLoading ? "Scheduling..." : "Start Campaign"}
@@ -210,7 +243,7 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
          </Card>
       </div>
 
-      {/* --- Right Column: Scheduled Emails --- */}
+      {/* --- Pravý Sloupec: Fronta emailů --- */}
       <div className="lg:col-span-2">
         <Card className="h-full">
           <CardHeader>
