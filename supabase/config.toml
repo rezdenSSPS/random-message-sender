@@ -2,3 +2,11 @@ project_id = "dfqmsilntawpnyyldmnv"
 
 [functions.send-random-emails]
 verify_jwt = false
+
+[functions.process-email-queue]
+verify_jwt = false
+
+[[cron.jobs]]
+name = "process-email-queue"
+schedule = "* * * * *" # every minute
+endpoint = "/functions/v1/process-email-queue"

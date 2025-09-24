@@ -4,6 +4,11 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@4.0.0";
 
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+};
+
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 // Helper function to generate a random string for the email username
@@ -16,7 +21,10 @@ function generateRandomString(length: number): string {
   return result;
 }
 
-const handler = async (_req: Request): Promise<Response> => {
+const handler = async (req: Request): Promise<Response> => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { headers: corsHeaders });
+  }
   try {
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -42,7 +50,10 @@ const handler = async (_req: Request): Promise<Response> => {
 
     if (error) throw error;
     if (!dueEmails || dueEmails.length === 0) {
-      return new Response(JSON.stringify({ message: "No emails to send at this time." }), { status: 200 });
+      return new Response(
+        JSON.stringify({ message: "No emails to send at this time." }),
+        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      );
     }
 
     console.log(`Found ${dueEmails.length} email(s) to send.`);
@@ -51,11 +62,16 @@ const handler = async (_req: Request): Promise<Response> => {
     const processingPromises = dueEmails.map(async (email) => {
       try {
         const campaign = email.campaign;
-        
+
+        // Prefer a verified sender to satisfy Resend requirements
+        const envFrom = Deno.env.get("RESEND_FROM"); // e.g. "Your App <no-reply@yourdomain.com>"
+        const envDomain = Deno.env.get("RESEND_DOMAIN"); // e.g. "yourdomain.com"
         const randomUsername = generateRandomString(5);
-        const fromDomain = "tvojemamasmrdi.fun";
-        const dynamicFromEmail = `${randomUsername}@${fromDomain}`;
-        const finalFromAddress = `${campaign.from_email || 'Campaign Sender'} <${dynamicFromEmail}>`;
+        const fallbackDomain = envDomain || "resend.dev";
+        const dynamicFromEmail = `${randomUsername}@${fallbackDomain}`;
+        const finalFromAddress = envFrom
+          ? envFrom
+          : `${campaign.from_email || 'Campaign Sender'} <${dynamicFromEmail}>`;
 
         await resend.emails.send({
           from: finalFromAddress,
@@ -83,10 +99,16 @@ const handler = async (_req: Request): Promise<Response> => {
 
     await Promise.all(processingPromises);
 
-    return new Response(JSON.stringify({ message: `Processed ${dueEmails.length} emails.` }), { status: 200 });
+    return new Response(
+      JSON.stringify({ message: `Processed ${dueEmails.length} emails.` }),
+      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
   } catch (e) {
     console.error(e);
-    return new Response(JSON.stringify({ error: e.message }), { status: 500 });
+    return new Response(
+      JSON.stringify({ error: (e as any).message }),
+      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+    );
   }
 };
 

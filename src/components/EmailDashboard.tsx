@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Mail, Send, Clock, LogOut, Settings, User, Calendar as CalendarIcon } from "lucide-react";
+import { Mail, Send, Clock, LogOut, Settings, User, Calendar as CalendarIcon, Play } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
@@ -127,6 +127,17 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
     }
   };
 
+  const handleRunQueueNow = async () => {
+    try {
+      const { error } = await supabase.functions.invoke('process-email-queue');
+      if (error) throw error;
+      toast.success("Queue processed.");
+    } catch (err: any) {
+      console.error('Process queue error:', err);
+      toast.error(err.message || "Failed to process queue");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background p-4 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
       <div className="lg:col-span-1 space-y-6">
@@ -140,10 +151,15 @@ export const EmailDashboard = ({ onLogout }: { onLogout: () => void }) => {
                     <p className="text-muted-foreground">Set up and monitor campaigns</p>
                 </div>
             </div>
-            <Button onClick={onLogout} variant="outline" className="gap-2">
+            <div className="flex items-center gap-2">
+              <Button onClick={handleRunQueueNow} variant="secondary" className="gap-2">
+                <Play className="w-4 h-4" /> Run Queue Now
+              </Button>
+              <Button onClick={onLogout} variant="outline" className="gap-2">
                 <LogOut className="w-4 h-4" />
                 Logout
-            </Button>
+              </Button>
+            </div>
         </div>
         
         <Card>
