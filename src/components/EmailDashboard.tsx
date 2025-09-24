@@ -39,6 +39,7 @@ const fetchScheduledEmails = async (): Promise<ScheduledEmail[]> => {
       )
     `)
     .eq('status', 'scheduled')
+    .gt('scheduled_at', new Date().toISOString())
     .order('scheduled_at', { ascending: true });
 
   if (error) {

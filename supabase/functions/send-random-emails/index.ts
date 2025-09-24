@@ -49,8 +49,9 @@ const handler = async (req: Request): Promise<Response> => {
     const now = new Date();
 
     if (scheduleType === "now") {
+      // Schedule immediately (spread within next 5 seconds max)
       for (let i = 0; i < count; i++) {
-        const delay = Math.random() * 60 * 1000;
+        const delay = Math.random() * 5000;
         scheduledTimestamps.push(new Date(now.getTime() + delay));
       }
     } else if (scheduleType === "scheduled" && scheduleDate && startTime && endTime) {
